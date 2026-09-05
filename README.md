@@ -20,10 +20,11 @@ you fully control.
    - OAuth consent screen: choose "External" (Testing mode is fine for personal use), add your own Google account as a test user.
    - Create OAuth credentials of type **Desktop app**, download the JSON, save it as `client_secret.json` in this folder.
 
-2. **Anthropic**
-   - Get an API key from [console.anthropic.com](https://console.anthropic.com).
+2. **LLM provider** (used for song classification) -- pick one:
+   - **Anthropic** directly: get an API key from [console.anthropic.com](https://console.anthropic.com).
+   - **OpenRouter**: get an API key from [openrouter.ai/keys](https://openrouter.ai/keys). Lets you route to Anthropic, OpenAI, or dozens of other models via `OPENROUTER_MODEL` (default `anthropic/claude-sonnet-5`; see [openrouter.ai/models](https://openrouter.ai/models) for other slugs).
 
-3. Copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY`.
+3. Copy `.env.example` to `.env` and fill in the API key for whichever provider you picked (`ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY`). If you fill in both, set `LLM_PROVIDER=anthropic` or `LLM_PROVIDER=openrouter` in `.env` to say which one wins -- otherwise it's auto-detected from whichever key is set.
 
 4. Install dependencies:
    ```
