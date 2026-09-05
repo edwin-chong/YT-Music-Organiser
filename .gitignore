@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# secrets
+.env
+client_secret*.json
+token.json
+
+# runtime state
+state/

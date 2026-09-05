@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ytorganiser dashboard</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, sans-serif; background: #111318; color: #e8e8ec;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; padding: 10px 16px;
+    background: #1a1d24; border-bottom: 1px solid #2a2e38; position: sticky; top: 0; z-index: 5;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; color: #aab0c0; }
+  #quota { margin-left: auto; font-size: 12px; color: #9aa; }
+  #quota.low { color: #e57373; }
+  button {
+    background: #2a2e38; color: #e8e8ec; border: 1px solid #3a3f4c; border-radius: 6px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #343a46; }
+  #toast {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: #e57373; color: #1a1d24; padding: 8px 16px; border-radius: 6px;
+    font-size: 13px; display: none; z-index: 10; max-width: 80vw;
+  }
+  #board { display: flex; gap: 14px; padding: 14px; overflow-x: auto; align-items: flex-start; height: calc(100vh - 49px); }
+  .column {
+    flex: 0 0 240px; background: #1a1d24; border: 1px solid #2a2e38; border-radius: 10px;
+    display: flex; flex-direction: column; max-height: 100%;
+  }
+  .column.dragover { border-color: #6ea8fe; }
+  .column.locked { opacity: 0.85; }
+  .col-header {
+    padding: 10px 12px; border-bottom: 1px solid #2a2e38; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .col-header .count { font-weight: 400; color: #888; font-size: 11px; margin-left: auto; }
+  .col-body { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .card {
+    background: #22262f; border: 1px solid #2f3440; border-radius: 8px; overflow: hidden;
+    cursor: grab; display: flex; flex-direction: column;
+  }
+  .card.dragging { opacity: 0.4; }
+  .card img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; background: #000; }
+  .card .meta { padding: 6px 8px; font-size: 12px; }
+  .card .title {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    color: #e8e8ec; text-decoration: none;
+  }
+  .card .title:hover { text-decoration: underline; }
+  .card .dur { color: #888; font-size: 11px; margin-top: 2px; }
+  .empty { color: #666; font-size: 12px; padding: 12px; text-align: center; }
+  .new-col {
+    flex: 0 0 200px; display: flex; align-items: center; justify-content: center;
+    border: 1px dashed #3a3f4c; border-radius: 10px; min-height: 60px; color: #888;
+    cursor: pointer; font-size: 13px;
+  }
+  .new-col:hover { border-color: #6ea8fe; color: #ccc; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ytorganiser</h1>
+  <div id="quota">quota: loading...</div>
+</header>
+<div id="toast"></div>
+<div id="board"></div>
+
+<script>
+const LIKED_KEY = "LIKED_VIDEOS";
+const board = document.getElementById("board");
+const toastEl = document.getElementById("toast");
+const quotaEl = document.getElementById("quota");
+
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.style.display = "block";
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => (toastEl.style.display = "none"), 4000);
+}
+
+function fmtDuration(sec) {
+  if (!sec) return "";
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const mm = h ? String(m).padStart(2, "0") : String(m);
+  const ss = String(s).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || res.statusText);
+  return body;
+}
+
+async function refreshQuota() {
+  try {
+    const q = await api("/api/quota");
+    quotaEl.textContent = `quota: ${q.remaining} / ${q.budget} units left today`;
+    quotaEl.classList.toggle("low", q.remaining < 500);
+  } catch (e) { /* ignore */ }
+}
+
+function cardEl(item, playlistId) {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.draggable = true;
+  el.innerHTML = `
+    ${item.thumbnail ? `<img src="${item.thumbnail}" loading="lazy">` : ""}
+    <div class="meta">
+      <a class="title" target="_blank" rel="noopener"
+         href="https://www.youtube.com/watch?v=${item.video_id}" title="${item.title.replace(/"/g,'&quot;')}">${item.title}</a>
+      <div class="dur">${fmtDuration(item.duration_seconds)}</div>
+    </div>`;
+  el.addEventListener("dragstart", (ev) => {
+    el.classList.add("dragging");
+    ev.dataTransfer.setData("application/json", JSON.stringify({
+      video_id: item.video_id,
+      from_playlist_id: playlistId,
+      from_item_id: item.playlist_item_id,
+    }));
+  });
+  el.addEventListener("dragend", () => el.classList.remove("dragging"));
+  return el;
+}
+
+async function loadColumn(playlist) {
+  const col = document.createElement("div");
+  col.className = "column" + (playlist.read_only ? " locked" : "");
+  col.dataset.playlistId = playlist.playlist_id;
+  col.innerHTML = `
+    <div class="col-header">
+      ${playlist.read_only ? "🔒" : "🎵"} ${playlist.title}
+      <span class="count">${playlist.item_count ?? ""}</span>
+    </div>
+    <div class="col-body"><div class="empty">loading...</div></div>`;
+  board.appendChild(col);
+
+  const bodyEl = col.querySelector(".col-body");
+
+  if (!playlist.read_only) {
+    col.addEventListener("dragover", (ev) => { ev.preventDefault(); col.classList.add("dragover"); });
+    col.addEventListener("dragleave", () => col.classList.remove("dragover"));
+    col.addEventListener("drop", async (ev) => {
+      ev.preventDefault();
+      col.classList.remove("dragover");
+      const raw = ev.dataTransfer.getData("application/json");
+      if (!raw) return;
+      const payload = JSON.parse(raw);
+      if (payload.from_playlist_id === playlist.playlist_id) return;
+      try {
+        await api("/api/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, to_playlist_id: playlist.playlist_id }),
+        });
+        toast(`Moved to "${playlist.title}"`);
+        await Promise.all([reloadColumn(playlist), refreshQuota()]);
+        if (payload.from_playlist_id !== LIKED_KEY) {
+          const srcPlaylist = allPlaylists.find(p => p.playlist_id === payload.from_playlist_id);
+          if (srcPlaylist) await reloadColumn(srcPlaylist);
+        }
+      } catch (e) {
+        toast(`Move failed: ${e.message}`);
+      }
+    });
+  }
+
+  await reloadColumn(playlist);
+}
+
+async function reloadColumn(playlist) {
+  const col = board.querySelector(`.column[data-playlist-id="${CSS.escape(playlist.playlist_id)}"]`);
+  if (!col) return;
+  const bodyEl = col.querySelector(".col-body");
+  try {
+    const items = await api(`/api/playlists/${encodeURIComponent(playlist.playlist_id)}/items`);
+    bodyEl.innerHTML = "";
+    if (items.length === 0) bodyEl.innerHTML = '<div class="empty">empty</div>';
+    for (const item of items) bodyEl.appendChild(cardEl(item, playlist.playlist_id));
+    const countEl = col.querySelector(".count");
+    if (countEl) countEl.textContent = items.length;
+  } catch (e) {
+    bodyEl.innerHTML = `<div class="empty">${e.message}</div>`;
+  }
+}
+
+let allPlaylists = [];
+
+async function init() {
+  refreshQuota();
+  try {
+    allPlaylists = await api("/api/playlists");
+  } catch (e) {
+    board.innerHTML = `<div class="empty">Failed to load playlists: ${e.message}</div>`;
+    return;
+  }
+  for (const p of allPlaylists) await loadColumn(p);
+
+  const newCol = document.createElement("div");
+  newCol.className = "new-col";
+  newCol.textContent = "+ New playlist";
+  newCol.addEventListener("click", async () => {
+    const title = prompt("New playlist name:");
+    if (!title) return;
+    try {
+      const created = await api("/api/playlists", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const playlist = { playlist_id: created.playlist_id, title: created.title, item_count: 0, read_only: false };
+      allPlaylists.push(playlist);
+      newCol.remove();
+      await loadColumn(playlist);
+      board.appendChild(newCol);
+      refreshQuota();
+    } catch (e) { toast(`Couldn't create playlist: ${e.message}`); }
+  });
+  board.appendChild(newCol);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Candidate genre/mood buckets. Claude assigns each liked song to the closest
+# one, or proposes a new bucket name if nothing fits (see classifier.py).
+# Edit freely -- changing this file invalidates the classification cache for
+# any video that was classified under the old list.
+buckets:
+  - name: Chill
+    description: mellow, relaxed, low-energy listening
+  - name: Workout
+    description: high-energy, driving tempo, good for exercise
+  - name: Focus / Study
+    description: instrumental or unobtrusive, good background for concentration
+  - name: Hip-Hop & Rap
+  - name: Rock
+  - name: Pop
+  - name: Electronic / Dance
+  - name: R&B & Soul
+  - name: Throwback / Classics
+    description: older songs, nostalgia
+  - name: Acoustic / Singer-Songwriter
+  - name: Instrumental / Lo-fi
+
+allow_new_buckets: true
