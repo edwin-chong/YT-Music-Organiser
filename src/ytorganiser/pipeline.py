@@ -34,10 +34,9 @@ def run(
         liked_playlist_id = yt.get_liked_playlist_id(youtube, data, daily_quota_budget)
 
         seen_ids = set(data["classified"]) | set(data["ignored"])
-        new_items = list(
-            yt.iter_liked_videos(youtube, liked_playlist_id, data, daily_quota_budget, stop_at_ids=seen_ids)
-        )
-        print(f"Found {len(new_items)} not-yet-processed liked video(s).")
+        all_items = list(yt.iter_liked_videos(youtube, liked_playlist_id, data, daily_quota_budget))
+        new_items = [v for v in all_items if v["video_id"] not in seen_ids]
+        print(f"{len(all_items)} liked video(s) total, {len(new_items)} not yet processed.")
         if not new_items:
             return
 
@@ -59,17 +58,19 @@ def run(
 
         to_classify = [v for v in new_items if v["video_id"] not in data["classified"]]
         if to_classify:
-            print(f"Classifying {len(to_classify)} song(s) with Claude...")
+            print(f"Classifying {len(to_classify)} song(s)...")
             classifier = Classifier(buckets_path=buckets_path)
-            results = classifier.classify_all(to_classify)
             by_id = {v["video_id"]: v for v in to_classify}
-            for r in results:
-                video_id = r["video_id"]
-                data["classified"][video_id] = {
-                    "bucket": r["bucket"],
-                    "title": by_id[video_id]["title"],
-                }
-        st.save(data)
+            for batch, results in classifier.classify_all(to_classify):
+                if results is None:
+                    continue  # this batch failed even after retries; try again next run
+                for r in results:
+                    video_id = r["video_id"]
+                    data["classified"][video_id] = {
+                        "bucket": r["bucket"],
+                        "title": by_id[video_id]["title"],
+                    }
+                st.save(data)  # persist each batch as it lands
 
         # Group all classified-but-not-yet-added videos by bucket (this can
         # include videos left over from a previous run that was cut short).

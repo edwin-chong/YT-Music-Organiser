@@ -10,3 +10,5 @@ token.json
 
 # runtime state
 state/
+*.log
+*.egg-info/

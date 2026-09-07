@@ -10,12 +10,15 @@ LLM_PROVIDER is left blank):
 """
 import json
 import os
+import time
 
 import yaml
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-BATCH_SIZE = 40
+BATCH_SIZE = 25
+MAX_TOKENS = 8000
+INTER_BATCH_DELAY_SECONDS = 1.0
 
 _PROMPT_TEMPLATE = """You are sorting a person's liked songs into playlists.
 
@@ -93,9 +96,35 @@ class Classifier:
                 },
             )
 
-    def classify_batch(self, songs: list[dict]) -> list[dict]:
+    def _call_llm(self, prompt: str) -> str:
+        if self.provider == "anthropic":
+            resp = self.client.messages.create(
+                model=self.model,
+                max_tokens=MAX_TOKENS,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            if resp.stop_reason == "max_tokens":
+                print(f"Warning: response hit max_tokens ({MAX_TOKENS}) and was truncated.")
+            return "".join(block.text for block in resp.content if block.type == "text")
+
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            max_tokens=MAX_TOKENS,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        choice = resp.choices[0]
+        if choice.finish_reason == "length":
+            print(f"Warning: response hit max_tokens ({MAX_TOKENS}) and was truncated.")
+        return choice.message.content or ""
+
+    def classify_batch(self, songs: list[dict], retries: int = 2) -> list[dict]:
         """songs: [{video_id, title, channel_title, description}, ...]
         Returns [{video_id, bucket, is_new_bucket}, ...]
+
+        Retries on a malformed/empty LLM response (transient provider hiccups
+        are common on batches this size); raises after exhausting retries so
+        the caller can decide what to do with this one batch without losing
+        any other already-classified batches.
         """
         new_bucket_instructions = (
             'If a song clearly does not fit any bucket, propose a short new bucket '
@@ -120,22 +149,24 @@ class Classifier:
             ),
         )
 
-        if self.provider == "anthropic":
-            resp = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = "".join(block.text for block in resp.content if block.type == "text")
+        last_err = None
+        for attempt in range(retries + 1):
+            text = None
+            try:
+                text = self._call_llm(prompt)
+                results = _parse_json_array(text)
+                break
+            except Exception as e:
+                snippet = repr(text[:200]) if text else "<empty>"
+                last_err = f"{e} (provider={self.provider}, model={self.model}, raw response: {snippet})"
+                if attempt < retries:
+                    time.sleep(5 * (attempt + 1))
         else:
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
+            raise RuntimeError(
+                f"Classification failed for a batch of {len(songs)} song(s) after "
+                f"{retries + 1} attempt(s): {last_err}"
             )
-            text = resp.choices[0].message.content
 
-        results = _parse_json_array(text)
         by_id = {r["video_id"]: r for r in results if "video_id" in r}
         # Fall back to "Other" for anything the model dropped.
         return [
@@ -143,8 +174,19 @@ class Classifier:
             for s in songs
         ]
 
-    def classify_all(self, songs: list[dict]) -> list[dict]:
-        out = []
+    def classify_all(self, songs: list[dict]):
+        """Yields (batch_songs, batch_results) per batch, so a caller can save
+        progress incrementally. If a batch fails even after retries, yields
+        (batch_songs, None) for it and moves on -- those songs stay
+        unclassified and get retried on the next run rather than crashing
+        (and losing) everything already classified in earlier batches.
+        """
         for i in range(0, len(songs), BATCH_SIZE):
-            out.extend(self.classify_batch(songs[i : i + BATCH_SIZE]))
-        return out
+            if i > 0:
+                time.sleep(INTER_BATCH_DELAY_SECONDS)
+            batch = songs[i : i + BATCH_SIZE]
+            try:
+                yield batch, self.classify_batch(batch)
+            except Exception as e:
+                print(f"Warning: {e}. These {len(batch)} song(s) will be retried next run.")
+                yield batch, None
