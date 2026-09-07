@@ -48,9 +48,15 @@ def _charge(data: dict, units: int, daily_budget: int) -> None:
     st.spend_quota(data, units, daily_budget)
 
 
-def _call(request):
+def _call(request, num_retries: int = 5):
+    """num_retries is handled by googleapiclient itself: it retries with
+    backoff on both transient HttpErrors (429/500/502/503/504, rate-limit
+    reasons) and raw connection-level failures (dropped/corrupted connections,
+    SSL errors, IncompleteRead, etc.) -- the latter can't be caught as
+    HttpError since they never got a parsed HTTP response at all.
+    """
     try:
-        return request.execute()
+        return request.execute(num_retries=num_retries)
     except HttpError as e:
         reason = ""
         try:
@@ -74,13 +80,16 @@ def get_liked_playlist_id(youtube, data: dict, daily_budget: int) -> str:
     return resp["items"][0]["contentDetails"]["relatedPlaylists"]["likes"]
 
 
-def iter_liked_videos(youtube, liked_playlist_id: str, data: dict, daily_budget: int,
-                       stop_at_ids: set[str] | None = None):
-    """Yields liked-video items, most recently liked first. Stops early once it
-    reaches a video_id in stop_at_ids (already-seen videos from a prior run),
-    since the Liked Videos playlist is ordered by like date descending.
+def iter_liked_videos(youtube, liked_playlist_id: str, data: dict, daily_budget: int):
+    """Yields every liked-video item, most recently liked first.
+
+    Always walks the full list rather than stopping at previously-seen videos:
+    a run that only partially processes its batch (--limit, or a quota cutoff)
+    can leave gaps in what's been handled, and an early-stop keyed off "have I
+    seen this id before" would abandon everything older than the first gap it
+    hits. Reads are cheap (1 unit per 50 items) so this is fine even for a
+    multi-thousand-video history; callers filter by their own seen-set instead.
     """
-    stop_at_ids = stop_at_ids or set()
     page_token = None
     while True:
         _charge(data, COST_READ, daily_budget)
@@ -94,8 +103,6 @@ def iter_liked_videos(youtube, liked_playlist_id: str, data: dict, daily_budget:
         )
         for item in resp.get("items", []):
             video_id = item["contentDetails"]["videoId"]
-            if video_id in stop_at_ids:
-                return
             snippet = item["snippet"]
             yield {
                 "video_id": video_id,
@@ -206,7 +213,7 @@ def list_playlists_full(youtube, data: dict, daily_budget: int) -> list[dict]:
 
 
 def list_playlist_items_full(youtube, playlist_id: str, data: dict, daily_budget: int) -> list[dict]:
-    """[{playlist_item_id, video_id, title, thumbnail, duration_seconds}, ...]
+    """[{playlist_item_id, video_id, title, thumbnail, duration_seconds, category_id}, ...]
     in playlist order. playlist_item_id is required to remove/move an item.
     """
     items = []
@@ -237,21 +244,29 @@ def list_playlist_items_full(youtube, playlist_id: str, data: dict, daily_budget
         if not page_token:
             break
 
-    durations = get_video_durations(youtube, [i["video_id"] for i in items], data, daily_budget)
+    details = get_video_details(youtube, [i["video_id"] for i in items], data, daily_budget)
     for item in items:
-        item["duration_seconds"] = durations.get(item["video_id"], 0)
+        d = details.get(item["video_id"], {})
+        item["duration_seconds"] = d.get("duration_seconds", 0)
+        item["category_id"] = d.get("category_id")
     return items
 
 
-def get_video_durations(youtube, video_ids: list[str], data: dict, daily_budget: int) -> dict:
-    """{video_id: duration_seconds}"""
+def get_video_details(youtube, video_ids: list[str], data: dict, daily_budget: int) -> dict:
+    """{video_id: {duration_seconds, category_id}} -- one videos.list call per
+    50 ids (part=snippet,contentDetails costs the same 1 unit as a single
+    part would), so duration + category come for free together.
+    """
     out = {}
     for i in range(0, len(video_ids), 50):
         batch = video_ids[i : i + 50]
         if not batch:
             continue
         _charge(data, COST_READ, daily_budget)
-        resp = _call(youtube.videos().list(part="contentDetails", id=",".join(batch)))
+        resp = _call(youtube.videos().list(part="snippet,contentDetails", id=",".join(batch)))
         for item in resp.get("items", []):
-            out[item["id"]] = parse_duration_seconds(item["contentDetails"]["duration"])
+            out[item["id"]] = {
+                "duration_seconds": parse_duration_seconds(item["contentDetails"]["duration"]),
+                "category_id": item["snippet"].get("categoryId"),
+            }
     return out

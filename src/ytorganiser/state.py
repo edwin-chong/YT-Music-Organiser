@@ -37,12 +37,17 @@ def load() -> dict:
 
 
 def save(data: dict) -> None:
-    os.makedirs(STATE_DIR, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=STATE_DIR)
+    write_json_atomic(STATE_FILE, data)
+
+
+def write_json_atomic(path: str, data: dict) -> None:
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        os.replace(tmp_path, STATE_FILE)
+        os.replace(tmp_path, path)
     except BaseException:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)

@@ -56,9 +56,30 @@ ytorganiser dashboard
 ```
 
 Opens `http://127.0.0.1:5000` — a Trello-style board with one column per
-playlist (plus a read-only "Liked Videos" column). Drag a song card between
-columns to move it; drop onto a new playlist to add it there. Each card shows
-thumbnail, title, and duration.
+playlist (plus a read-only "Liked Videos" column). Each card shows thumbnail,
+title, and duration; drag the ⠿ handle in a column's header to reorder
+playlists (a local display preference, doesn't touch YouTube).
+
+**Dragging a song between columns only stages the change** — nothing is sent
+to YouTube until you click **💾 Save N changes** in the header, which applies
+every staged move in one go (✕ **Discard** clears them instead). Staged cards
+get a gold outline; dragging one back to its original column cancels that one
+change. This lets you do a whole reorganizing session before spending any
+quota, rather than paying per drag.
+
+**📋 on a column** creates a new playlist seeded with a copy of everything
+currently in that column (works on Liked Videos too, since it only ever adds
+to the new playlist — the source is never touched). Large sources are copied
+until the daily quota runs out, then stop cleanly and tell you how much made it in.
+
+Everything you *view* is served from a local cache (`state/dashboard_cache.json`)
+— opening the dashboard or scrolling through columns never calls the YouTube
+API. Moving/adding/removing/creating updates the cache directly too, so
+normal use costs no read quota at all. The API is only called on an explicit
+refresh, which you control per scope:
+- **🔄 New playlists** — cheap; just checks for playlists created elsewhere since you last opened the dashboard, without re-fetching songs in existing ones.
+- **🔄 (per column)** — re-fetches just that one playlist's songs.
+- **🔄 Refresh all** — re-fetches every playlist and every column's songs; costs the most quota, asks for confirmation.
 
 ## Quota notes
 

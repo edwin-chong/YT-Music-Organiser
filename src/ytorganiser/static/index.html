@@ -10,41 +10,51 @@
     margin: 0; font-family: system-ui, sans-serif; background: #111318; color: #e8e8ec;
   }
   header {
-    display: flex; align-items: center; gap: 16px; padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px; padding: 10px 16px;
     background: #1a1d24; border-bottom: 1px solid #2a2e38; position: sticky; top: 0; z-index: 5;
   }
-  header h1 { font-size: 15px; margin: 0; font-weight: 600; color: #aab0c0; }
-  #quota { margin-left: auto; font-size: 12px; color: #9aa; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; color: #aab0c0; margin-right: 6px; }
+  #quota { margin-left: auto; font-size: 12px; color: #9aa; white-space: nowrap; }
   #quota.low { color: #e57373; }
   button {
     background: #2a2e38; color: #e8e8ec; border: 1px solid #3a3f4c; border-radius: 6px;
     padding: 6px 12px; font-size: 13px; cursor: pointer;
   }
   button:hover { background: #343a46; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.icon { padding: 3px 6px; font-size: 12px; line-height: 1; }
+  #save-bar { display: flex; gap: 8px; align-items: center; }
+  #save-btn { background: #2f6f4f; border-color: #3d8a63; }
+  #save-btn:hover { background: #37815b; }
   #toast {
     position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
     background: #e57373; color: #1a1d24; padding: 8px 16px; border-radius: 6px;
     font-size: 13px; display: none; z-index: 10; max-width: 80vw;
   }
-  #board { display: flex; gap: 14px; padding: 14px; overflow-x: auto; align-items: flex-start; height: calc(100vh - 49px); }
+  #board { display: flex; gap: 14px; padding: 14px; overflow-x: auto; align-items: stretch; height: calc(100vh - 49px); }
   .column {
-    flex: 0 0 240px; background: #1a1d24; border: 1px solid #2a2e38; border-radius: 10px;
-    display: flex; flex-direction: column; max-height: 100%;
+    flex: 0 0 260px; min-width: 260px; min-height: 360px; background: #1a1d24; border: 1px solid #2a2e38; border-radius: 10px;
+    display: flex; flex-direction: column; overflow: hidden;
   }
   .column.dragover { border-color: #6ea8fe; }
   .column.locked { opacity: 0.85; }
+  .column.hidden-playlist { opacity: 0.6; border-style: dashed; }
   .col-header {
-    padding: 10px 12px; border-bottom: 1px solid #2a2e38; font-size: 13px; font-weight: 600;
-    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px; border-bottom: 1px solid #2a2e38; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   }
+  .drag-handle { cursor: grab; color: #666; }
+  .drag-handle:active { cursor: grabbing; }
   .col-header .count { font-weight: 400; color: #888; font-size: 11px; margin-left: auto; }
-  .col-body { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .col-freshness { padding: 4px 10px; font-size: 10px; color: #666; border-bottom: 1px solid #2a2e38; flex-shrink: 0; }
+  .col-body { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
   .card {
     background: #22262f; border: 1px solid #2f3440; border-radius: 8px; overflow: hidden;
-    cursor: grab; display: flex; flex-direction: column;
+    cursor: grab; display: flex; flex-direction: column; flex-shrink: 0;
   }
   .card.dragging { opacity: 0.4; }
-  .card img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; background: #000; }
+  .card.pending { border-color: #d9a441; box-shadow: 0 0 0 1px #d9a441 inset; }
+  .card img { width: 100%; height: 130px; display: block; object-fit: cover; background: #000; flex-shrink: 0; }
   .card .meta { padding: 6px 8px; font-size: 12px; }
   .card .title {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -59,11 +69,45 @@
     cursor: pointer; font-size: 13px;
   }
   .new-col:hover { border-color: #6ea8fe; color: #ccc; }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center; z-index: 20; padding: 20px;
+  }
+  .modal {
+    background: #1a1d24; border: 1px solid #2a2e38; border-radius: 10px;
+    width: 480px; max-width: 100%; max-height: 100%; display: flex; flex-direction: column;
+  }
+  .modal-header { padding: 14px 16px; border-bottom: 1px solid #2a2e38; flex-shrink: 0; }
+  .modal-header h2 { font-size: 15px; margin: 0 0 8px; color: #e8e8ec; }
+  .modal-header input[type="text"] {
+    width: 100%; background: #22262f; border: 1px solid #3a3f4c; border-radius: 6px;
+    color: #e8e8ec; padding: 6px 8px; font-size: 13px;
+  }
+  .modal-toolbar {
+    padding: 8px 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #2a2e38; font-size: 12px; color: #9aa; flex-shrink: 0;
+  }
+  .modal-toolbar button { padding: 4px 10px; font-size: 12px; }
+  .modal-toolbar .sel-count { margin-left: auto; }
+  .modal-list { overflow-y: auto; padding: 8px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+  .modal-item { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+  .modal-item input[type="checkbox"] { flex-shrink: 0; }
+  .modal-item img { width: 60px; height: 34px; object-fit: cover; border-radius: 4px; background: #000; flex-shrink: 0; }
+  .modal-item .mi-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal-item .mi-dur { color: #888; flex-shrink: 0; }
+  .modal-footer { padding: 12px 16px; border-top: 1px solid #2a2e38; display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
 </style>
 </head>
 <body>
 <header>
   <h1>ytorganiser</h1>
+  <button id="refresh-new" title="Fetch newly-created playlists without re-fetching songs in existing ones (cheap)">🔄 New playlists</button>
+  <button id="refresh-all" title="Re-fetch the playlist list and every column's songs (costs the most quota)">🔄 Refresh all</button>
+  <button id="toggle-hidden" hidden></button>
+  <div id="save-bar" hidden>
+    <button id="save-btn"></button>
+    <button id="discard-btn">✕ Discard</button>
+  </div>
   <div id="quota">quota: loading...</div>
 </header>
 <div id="toast"></div>
@@ -74,6 +118,12 @@ const LIKED_KEY = "LIKED_VIDEOS";
 const board = document.getElementById("board");
 const toastEl = document.getElementById("toast");
 const quotaEl = document.getElementById("quota");
+
+let allPlaylists = [];
+let showHidden = false;
+let pendingMoves = new Map(); // key `${originPlaylist}::${originItem}` -> staged change
+let draggedCard = null;       // the DOM card element currently being dragged
+let draggedColumnId = null;   // playlist_id of the column currently being dragged (reorder)
 
 function toast(msg) {
   toastEl.textContent = msg;
@@ -88,6 +138,17 @@ function fmtDuration(sec) {
   const mm = h ? String(m).padStart(2, "0") : String(m);
   const ss = String(s).padStart(2, "0");
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function fmtAgo(iso) {
+  if (!iso) return "never fetched";
+  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return "updated just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `updated ${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `updated ${hours}h ago`;
+  return `updated ${Math.floor(hours / 24)}d ago`;
 }
 
 async function api(path, opts) {
@@ -109,6 +170,13 @@ function cardEl(item, playlistId) {
   const el = document.createElement("div");
   el.className = "card";
   el.draggable = true;
+  el.dataset.videoId = item.video_id;
+  el.dataset.originPlaylist = playlistId;
+  el.dataset.originItem = item.playlist_item_id;
+  el.dataset.currentPlaylist = playlistId;
+  el.dataset.title = item.title;
+  el.dataset.thumbnail = item.thumbnail || "";
+  el.dataset.duration = item.duration_seconds || 0;
   el.innerHTML = `
     ${item.thumbnail ? `<img src="${item.thumbnail}" loading="lazy">` : ""}
     <div class="meta">
@@ -117,58 +185,368 @@ function cardEl(item, playlistId) {
       <div class="dur">${fmtDuration(item.duration_seconds)}</div>
     </div>`;
   el.addEventListener("dragstart", (ev) => {
+    draggedCard = el;
     el.classList.add("dragging");
-    ev.dataTransfer.setData("application/json", JSON.stringify({
-      video_id: item.video_id,
-      from_playlist_id: playlistId,
-      from_item_id: item.playlist_item_id,
-    }));
+    ev.dataTransfer.effectAllowed = "move";
+    ev.dataTransfer.setData("text/plain", item.video_id);
   });
-  el.addEventListener("dragend", () => el.classList.remove("dragging"));
+  el.addEventListener("dragend", () => {
+    el.classList.remove("dragging");
+    draggedCard = null;
+  });
   return el;
+}
+
+function updateColumnCount(col) {
+  if (!col) return;
+  const n = col.querySelectorAll(".col-body .card").length;
+  const countEl = col.querySelector(".count");
+  if (countEl) countEl.textContent = n;
+}
+
+function pendingKey(originPlaylist, originItem) {
+  return `${originPlaylist}::${originItem}`;
+}
+
+function stagePendingMove(cardEl, targetPlaylistId) {
+  const originPlaylist = cardEl.dataset.originPlaylist;
+  const originItem = cardEl.dataset.originItem;
+  const key = pendingKey(originPlaylist, originItem);
+  const fromCol = board.querySelector(`.column[data-playlist-id="${CSS.escape(cardEl.dataset.currentPlaylist)}"]`);
+  const toCol = board.querySelector(`.column[data-playlist-id="${CSS.escape(targetPlaylistId)}"]`);
+  if (!toCol) return;
+  const toBody = toCol.querySelector(".col-body");
+
+  cardEl.dataset.currentPlaylist = targetPlaylistId;
+  toBody.querySelector(".empty")?.remove();
+  toBody.insertBefore(cardEl, toBody.firstChild);
+
+  if (targetPlaylistId === originPlaylist) {
+    // dragged back to where it started -- cancels out, nothing to save
+    pendingMoves.delete(key);
+    cardEl.classList.remove("pending");
+  } else {
+    pendingMoves.set(key, {
+      video_id: cardEl.dataset.videoId,
+      title: cardEl.dataset.title,
+      thumbnail: cardEl.dataset.thumbnail,
+      duration_seconds: Number(cardEl.dataset.duration) || 0,
+      origin_playlist_id: originPlaylist,
+      origin_item_id: originItem,
+      current_playlist_id: targetPlaylistId,
+    });
+    cardEl.classList.add("pending");
+  }
+
+  updateColumnCount(fromCol);
+  updateColumnCount(toCol);
+  const fromBody = fromCol?.querySelector(".col-body");
+  if (fromBody && fromBody.children.length === 0) fromBody.innerHTML = '<div class="empty">empty</div>';
+  updateSaveBar();
+}
+
+function reapplyPendingMoves() {
+  // After a full board re-render (column reorder, refresh, toggle-hidden),
+  // re-stage any not-yet-saved moves visually so nothing looks lost.
+  for (const change of pendingMoves.values()) {
+    const cardEl = board.querySelector(
+      `.card[data-origin-playlist="${CSS.escape(change.origin_playlist_id)}"][data-origin-item="${CSS.escape(change.origin_item_id)}"]`
+    );
+    const toCol = board.querySelector(`.column[data-playlist-id="${CSS.escape(change.current_playlist_id)}"]`);
+    if (!cardEl || !toCol) continue; // origin or target column isn't rendered right now (e.g. hidden)
+    const toBody = toCol.querySelector(".col-body");
+    cardEl.dataset.currentPlaylist = change.current_playlist_id;
+    cardEl.classList.add("pending");
+    toBody.querySelector(".empty")?.remove();
+    toBody.insertBefore(cardEl, toBody.firstChild);
+  }
+  board.querySelectorAll(".column").forEach(updateColumnCount);
+  board.querySelectorAll(".col-body").forEach(bodyEl => {
+    if (bodyEl.children.length === 0) bodyEl.innerHTML = '<div class="empty">empty</div>';
+  });
+  updateSaveBar();
+}
+
+function updateSaveBar(progressText) {
+  const bar = document.getElementById("save-bar");
+  const saveBtn = document.getElementById("save-btn");
+  const discardBtn = document.getElementById("discard-btn");
+  if (pendingMoves.size === 0 && !progressText) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  saveBtn.textContent = progressText || `💾 Save ${pendingMoves.size} change(s)`;
+  saveBtn.disabled = !!progressText;
+  discardBtn.disabled = !!progressText;
+}
+
+async function saveChanges() {
+  const entries = [...pendingMoves.values()];
+  if (entries.length === 0) return;
+  const touchedPlaylists = new Set();
+  let succeeded = 0;
+  updateSaveBar(`Saving 0/${entries.length}...`);
+  for (const change of entries) {
+    try {
+      await api("/api/move", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_id: change.video_id,
+          to_playlist_id: change.current_playlist_id,
+          from_playlist_id: change.origin_playlist_id,
+          from_item_id: change.origin_item_id,
+          title: change.title,
+          thumbnail: change.thumbnail,
+          duration_seconds: change.duration_seconds,
+        }),
+      });
+      pendingMoves.delete(pendingKey(change.origin_playlist_id, change.origin_item_id));
+      touchedPlaylists.add(change.origin_playlist_id);
+      touchedPlaylists.add(change.current_playlist_id);
+      succeeded++;
+      updateSaveBar(`Saving ${succeeded}/${entries.length}...`);
+    } catch (e) {
+      toast(`Saved ${succeeded}/${entries.length}; stopped: ${e.message}. Remaining changes are still staged -- click Save again later.`);
+      break;
+    }
+  }
+  for (const pid of touchedPlaylists) {
+    const p = allPlaylists.find(pl => pl.playlist_id === pid);
+    if (p) await reloadColumn(p);
+  }
+  if (succeeded === entries.length) toast(`Saved ${succeeded} change(s) to YouTube.`);
+  refreshQuota();
+  updateSaveBar();
+}
+
+async function discardChanges() {
+  if (pendingMoves.size === 0) return;
+  if (!confirm(`Discard ${pendingMoves.size} unsaved change(s)?`)) return;
+  pendingMoves.clear();
+  await renderColumns();
+}
+
+function reorderColumns(sourceId, targetId) {
+  if (sourceId === targetId) return;
+  const fromIdx = allPlaylists.findIndex(p => p.playlist_id === sourceId);
+  const toIdx = allPlaylists.findIndex(p => p.playlist_id === targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const [moved] = allPlaylists.splice(fromIdx, 1);
+  allPlaylists.splice(toIdx, 0, moved);
+  renderColumns();
+  saveColumnOrder();
+}
+
+async function saveColumnOrder() {
+  try {
+    await api("/api/column-order", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: allPlaylists.map(p => p.playlist_id) }),
+    });
+  } catch (e) { /* non-critical, just a display preference */ }
+}
+
+function openDuplicateModal(playlist, items) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Create playlist from "${playlist.title}"</h2>
+        <input type="text" id="modal-title" placeholder="New playlist name" value="${playlist.title} (copy)">
+      </div>
+      <div class="modal-toolbar">
+        <button id="modal-select-all">Select all</button>
+        <button id="modal-deselect-all">Deselect all</button>
+        <span class="sel-count"></span>
+      </div>
+      <div class="modal-list"></div>
+      <div class="modal-footer">
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-create">Create playlist</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const listEl = overlay.querySelector(".modal-list");
+  const countEl = overlay.querySelector(".sel-count");
+
+  function updateSelCount() {
+    const selected = listEl.querySelectorAll("input[type=checkbox]:checked").length;
+    countEl.textContent = `${selected} of ${items.length} selected`;
+  }
+
+  for (const item of items) {
+    const row = document.createElement("label");
+    row.className = "modal-item";
+    row.innerHTML = `
+      <input type="checkbox" checked data-item-id="${item.playlist_item_id}">
+      ${item.thumbnail ? `<img src="${item.thumbnail}" loading="lazy">` : `<span style="width:60px;flex-shrink:0"></span>`}
+      <span class="mi-title" title="${item.title.replace(/"/g, "&quot;")}">${item.title}</span>
+      <span class="mi-dur">${fmtDuration(item.duration_seconds)}</span>`;
+    listEl.appendChild(row);
+  }
+  listEl.addEventListener("change", updateSelCount);
+  updateSelCount();
+
+  overlay.querySelector("#modal-select-all").addEventListener("click", () => {
+    listEl.querySelectorAll("input[type=checkbox]").forEach(cb => (cb.checked = true));
+    updateSelCount();
+  });
+  overlay.querySelector("#modal-deselect-all").addEventListener("click", () => {
+    listEl.querySelectorAll("input[type=checkbox]").forEach(cb => (cb.checked = false));
+    updateSelCount();
+  });
+  overlay.querySelector("#modal-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+
+  overlay.querySelector("#modal-create").addEventListener("click", async () => {
+    const title = overlay.querySelector("#modal-title").value.trim();
+    if (!title) { toast("Enter a playlist name."); return; }
+    const itemIds = [...listEl.querySelectorAll("input[type=checkbox]:checked")].map(cb => cb.dataset.itemId);
+    if (itemIds.length === 0) { toast("Select at least one song."); return; }
+
+    const createBtn = overlay.querySelector("#modal-create");
+    createBtn.disabled = true;
+    createBtn.textContent = "Creating...";
+    try {
+      const result = await api("/api/playlists/from-source", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source_playlist_id: playlist.playlist_id, title, item_ids: itemIds }),
+      });
+      overlay.remove();
+      document.querySelector(".new-col")?.remove();
+      allPlaylists.push(result.playlist);
+      await loadColumn(result.playlist);
+      addNewPlaylistTile();
+      updateHiddenToggle();
+      refreshQuota();
+      const skippedNote = result.skipped ? `, ${result.skipped} unavailable` : "";
+      toast(
+        result.stopped_due_to_quota
+          ? `Created "${title}" with ${result.copied}/${result.total} selected songs${skippedNote} -- ran out of quota, rest left uncopied.`
+          : `Created "${title}" with ${result.copied} song(s)${skippedNote}.`
+      );
+    } catch (e) {
+      toast(`Couldn't create playlist: ${e.message}`);
+      createBtn.disabled = false;
+      createBtn.textContent = "Create playlist";
+    }
+  });
 }
 
 async function loadColumn(playlist) {
   const col = document.createElement("div");
-  col.className = "column" + (playlist.read_only ? " locked" : "");
+  col.className = "column" + (playlist.read_only ? " locked" : "") + (playlist.excluded ? " hidden-playlist" : "");
   col.dataset.playlistId = playlist.playlist_id;
+  const ratioHint = playlist.music_ratio == null ? "" : ` (${Math.round(playlist.music_ratio * 100)}% music)`;
   col.innerHTML = `
     <div class="col-header">
+      <span class="drag-handle" draggable="true" title="Drag to reorder playlists">⠿</span>
       ${playlist.read_only ? "🔒" : "🎵"} ${playlist.title}
-      <span class="count">${playlist.item_count ?? ""}</span>
+      <span class="count"></span>
+      <button class="icon col-refresh" title="Refresh this playlist's songs">🔄</button>
+      <button class="icon col-duplicate" title="Create a new playlist copied from this one">📋</button>
+      ${playlist.read_only ? "" : `<button class="icon col-visibility" title="${playlist.excluded ? "Include" : "Exclude"} this playlist${ratioHint}">${playlist.excluded ? "✓" : "⊘"}</button>`}
     </div>
+    <div class="col-freshness"></div>
     <div class="col-body"><div class="empty">loading...</div></div>`;
   board.appendChild(col);
 
-  const bodyEl = col.querySelector(".col-body");
+  const handle = col.querySelector(".drag-handle");
+  handle.addEventListener("dragstart", (ev) => {
+    draggedColumnId = playlist.playlist_id;
+    ev.dataTransfer.effectAllowed = "move";
+    ev.dataTransfer.setData("text/plain", playlist.playlist_id);
+  });
+  handle.addEventListener("dragend", () => { draggedColumnId = null; });
 
-  if (!playlist.read_only) {
-    col.addEventListener("dragover", (ev) => { ev.preventDefault(); col.classList.add("dragover"); });
-    col.addEventListener("dragleave", () => col.classList.remove("dragover"));
-    col.addEventListener("drop", async (ev) => {
-      ev.preventDefault();
-      col.classList.remove("dragover");
-      const raw = ev.dataTransfer.getData("application/json");
-      if (!raw) return;
-      const payload = JSON.parse(raw);
-      if (payload.from_playlist_id === playlist.playlist_id) return;
+  col.querySelector(".col-refresh").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    try {
+      await api("/api/refresh", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "items", playlist_id: playlist.playlist_id }),
+      });
+      const { playlists } = await api("/api/playlists");
+      allPlaylists = playlists;
+      const updated = allPlaylists.find(p => p.playlist_id === playlist.playlist_id);
+      Object.assign(playlist, updated);
+      if (playlist.excluded && !showHidden) {
+        col.remove();
+        toast(`"${playlist.title}" looks like it's mostly not music (${Math.round((playlist.music_ratio || 0) * 100)}%) -- hidden.`);
+      } else {
+        col.className = "column" + (playlist.read_only ? " locked" : "") + (playlist.excluded ? " hidden-playlist" : "");
+        await reloadColumn(playlist);
+      }
+      updateHiddenToggle();
+      refreshQuota();
+    } catch (e) {
+      toast(`Refresh failed: ${e.message}`);
+    } finally {
+      ev.target.disabled = false;
+    }
+  });
+
+  col.querySelector(".col-duplicate").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    try {
+      const { items } = await api(`/api/playlists/${encodeURIComponent(playlist.playlist_id)}/items`);
+      if (items.length === 0) {
+        toast("This playlist has no songs to copy.");
+      } else {
+        openDuplicateModal(playlist, items);
+      }
+    } catch (e) {
+      toast(`Couldn't load songs: ${e.message}`);
+    } finally {
+      ev.target.disabled = false;
+    }
+  });
+
+  const visBtn = col.querySelector(".col-visibility");
+  if (visBtn) {
+    visBtn.addEventListener("click", async (ev) => {
+      ev.target.disabled = true;
+      const newExcluded = !playlist.excluded;
       try {
-        await api("/api/move", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, to_playlist_id: playlist.playlist_id }),
+        await api(`/api/playlists/${encodeURIComponent(playlist.playlist_id)}/visibility`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ excluded: newExcluded }),
         });
-        toast(`Moved to "${playlist.title}"`);
-        await Promise.all([reloadColumn(playlist), refreshQuota()]);
-        if (payload.from_playlist_id !== LIKED_KEY) {
-          const srcPlaylist = allPlaylists.find(p => p.playlist_id === payload.from_playlist_id);
-          if (srcPlaylist) await reloadColumn(srcPlaylist);
+        playlist.excluded = newExcluded;
+        const cached = allPlaylists.find(p => p.playlist_id === playlist.playlist_id);
+        if (cached) cached.excluded = newExcluded;
+        if (newExcluded && !showHidden) {
+          col.remove();
+        } else {
+          col.classList.toggle("hidden-playlist", newExcluded);
+          visBtn.textContent = newExcluded ? "✓" : "⊘";
+          visBtn.title = `${newExcluded ? "Include" : "Exclude"} this playlist`;
         }
+        updateHiddenToggle();
       } catch (e) {
-        toast(`Move failed: ${e.message}`);
+        toast(`Couldn't update visibility: ${e.message}`);
+      } finally {
+        ev.target.disabled = false;
       }
     });
   }
+
+  col.addEventListener("dragover", (ev) => { ev.preventDefault(); col.classList.add("dragover"); });
+  col.addEventListener("dragleave", () => col.classList.remove("dragover"));
+  col.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    col.classList.remove("dragover");
+    if (draggedColumnId) {
+      reorderColumns(draggedColumnId, playlist.playlist_id);
+      return;
+    }
+    if (playlist.read_only || !draggedCard) return;
+    if (draggedCard.dataset.currentPlaylist === playlist.playlist_id) return;
+    stagePendingMove(draggedCard, playlist.playlist_id);
+  });
 
   await reloadColumn(playlist);
 }
@@ -178,29 +556,20 @@ async function reloadColumn(playlist) {
   if (!col) return;
   const bodyEl = col.querySelector(".col-body");
   try {
-    const items = await api(`/api/playlists/${encodeURIComponent(playlist.playlist_id)}/items`);
+    const { items, fetched_at } = await api(`/api/playlists/${encodeURIComponent(playlist.playlist_id)}/items`);
     bodyEl.innerHTML = "";
     if (items.length === 0) bodyEl.innerHTML = '<div class="empty">empty</div>';
     for (const item of items) bodyEl.appendChild(cardEl(item, playlist.playlist_id));
     const countEl = col.querySelector(".count");
     if (countEl) countEl.textContent = items.length;
+    const freshEl = col.querySelector(".col-freshness");
+    if (freshEl) freshEl.textContent = fmtAgo(fetched_at);
   } catch (e) {
     bodyEl.innerHTML = `<div class="empty">${e.message}</div>`;
   }
 }
 
-let allPlaylists = [];
-
-async function init() {
-  refreshQuota();
-  try {
-    allPlaylists = await api("/api/playlists");
-  } catch (e) {
-    board.innerHTML = `<div class="empty">Failed to load playlists: ${e.message}</div>`;
-    return;
-  }
-  for (const p of allPlaylists) await loadColumn(p);
-
+function addNewPlaylistTile() {
   const newCol = document.createElement("div");
   newCol.className = "new-col";
   newCol.textContent = "+ New playlist";
@@ -212,15 +581,102 @@ async function init() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
       });
-      const playlist = { playlist_id: created.playlist_id, title: created.title, item_count: 0, read_only: false };
-      allPlaylists.push(playlist);
+      allPlaylists.push(created);
       newCol.remove();
-      await loadColumn(playlist);
-      board.appendChild(newCol);
+      await loadColumn(created);
+      addNewPlaylistTile();
       refreshQuota();
     } catch (e) { toast(`Couldn't create playlist: ${e.message}`); }
   });
   board.appendChild(newCol);
+}
+
+function updateHiddenToggle() {
+  const btn = document.getElementById("toggle-hidden");
+  const hiddenCount = allPlaylists.filter(p => p.excluded).length;
+  if (hiddenCount === 0 && !showHidden) {
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+  btn.textContent = showHidden ? `🙈 Hide ${hiddenCount} excluded` : `👁 Show ${hiddenCount} excluded`;
+}
+
+async function renderColumns() {
+  board.innerHTML = "";
+  const toRender = allPlaylists.filter(p => showHidden || !p.excluded);
+  for (const p of toRender) await loadColumn(p);
+  addNewPlaylistTile();
+  updateHiddenToggle();
+  reapplyPendingMoves();
+}
+
+async function init() {
+  refreshQuota();
+  try {
+    const { playlists } = await api("/api/playlists");
+    allPlaylists = playlists;
+  } catch (e) {
+    board.innerHTML = `<div class="empty">Failed to load playlists: ${e.message}</div>`;
+    return;
+  }
+  await renderColumns();
+
+  document.getElementById("save-btn").addEventListener("click", saveChanges);
+  document.getElementById("discard-btn").addEventListener("click", discardChanges);
+
+  document.getElementById("toggle-hidden").addEventListener("click", async () => {
+    showHidden = !showHidden;
+    await renderColumns();
+  });
+
+  document.getElementById("refresh-new").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    try {
+      await api("/api/refresh", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "new_playlists" }),
+      });
+      const { playlists } = await api("/api/playlists");
+      const knownIds = new Set(allPlaylists.map(p => p.playlist_id));
+      const fresh = playlists.filter(p => !knownIds.has(p.playlist_id));
+      allPlaylists = playlists;
+      if (fresh.length === 0) {
+        toast("No new playlists found.");
+      } else {
+        document.querySelector(".new-col")?.remove();
+        for (const p of fresh.filter(p => showHidden || !p.excluded)) await loadColumn(p);
+        addNewPlaylistTile();
+        updateHiddenToggle();
+        toast(`Found ${fresh.length} new playlist(s).`);
+      }
+      refreshQuota();
+    } catch (e) {
+      toast(`Refresh failed: ${e.message}`);
+    } finally {
+      ev.target.disabled = false;
+    }
+  });
+
+  document.getElementById("refresh-all").addEventListener("click", async (ev) => {
+    if (!confirm("Refresh every playlist and every column's songs? This spends the most quota.")) return;
+    ev.target.disabled = true;
+    try {
+      await api("/api/refresh", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "all" }),
+      });
+      const { playlists } = await api("/api/playlists");
+      allPlaylists = playlists;
+      await renderColumns();
+      refreshQuota();
+      toast("Refreshed everything.");
+    } catch (e) {
+      toast(`Refresh failed: ${e.message}`);
+    } finally {
+      ev.target.disabled = false;
+    }
+  });
 }
 
 init();
